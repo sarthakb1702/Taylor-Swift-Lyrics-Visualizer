@@ -3,7 +3,7 @@ import lyricsgenius
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 
-GENIUS_API_TOKEN = "your_token"
+GENIUS_API_TOKEN = "imyDitmjO9dGzp8-q_reNPVhhTUt3epo85QDXguArkrFTk45kvWYsyHK6nCnpZqc0Xh61tQETjwJc8FFS-pYCQ"
 
 genius = lyricsgenius.Genius(GENIUS_API_TOKEN)
 genius.skip_non_songs = True
