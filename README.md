@@ -11,10 +11,6 @@ An interactive web app built with Streamlit that lets you search for Taylor Swif
 - Securely manage the Genius API token using Streamlit Secrets
 - Simple, responsive, and user-friendly interface
 
-## Demo
-
-[Live Streamlit App Link](YOUR_STREAMLIT_APP_URL_HERE)
-
 ## Getting Started
 
 ### Prerequisites
