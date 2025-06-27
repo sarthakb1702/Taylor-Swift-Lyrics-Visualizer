@@ -7,9 +7,9 @@ import os
 
 # --- Safely load Genius API token from secrets or env variable ---
 try:
-    GENIUS_ACCESS_TOKEN = "GSAh_zUL0qbv3n_RyI-AuR8BTwzxwwA7Jg984CidLD-ez1HThTAW6npnZ6i_0zKi"
+    GENIUS_ACCESS_TOKEN = st.secrets["GENIUS_ACCESS_TOKEN"]
 except FileNotFoundError:
-    GENIUS_ACCESS_TOKEN = "GSAh_zUL0qbv3n_RyI-AuR8BTwzxwwA7Jg984CidLD-ez1HThTAW6npnZ6i_0zKi"
+    GENIUS_ACCESS_TOKEN = os.getenv("GENIUS_ACCESS_TOKEN")
 
 if not GENIUS_ACCESS_TOKEN:
     st.error("Please set the GENIUS_ACCESS_TOKEN in Streamlit secrets or environment variable.")
