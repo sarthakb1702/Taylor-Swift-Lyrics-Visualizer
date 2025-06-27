@@ -5,6 +5,7 @@ from wordcloud import WordCloud, STOPWORDS
 import matplotlib.pyplot as plt
 import os
 
+st.write("Loaded GENIUS_ACCESS_TOKEN?", "GENIUS_ACCESS_TOKEN" in st.secrets)
 # --- Safely load Genius API token from secrets or env variable ---
 try:
     GENIUS_ACCESS_TOKEN = st.secrets["GENIUS_ACCESS_TOKEN"]
