@@ -1,16 +1,21 @@
 import streamlit as st
-import lyricsgenius
+import requests
+from bs4 import BeautifulSoup
 from wordcloud import WordCloud, STOPWORDS
 import matplotlib.pyplot as plt
 import os
-import re
-from dotenv import load_dotenv
 
-# --- Load environment variables ---
-load_dotenv()
-GENIUS_ACCESS_TOKEN = os.getenv("GENIUS_ACCESS_TOKEN")
+# --- Safely load Genius API token from secrets or env variable ---
+try:
+    GENIUS_ACCESS_TOKEN = st.secrets["GENIUS_ACCESS_TOKEN"]
+except FileNotFoundError:
+    GENIUS_ACCESS_TOKEN = os.getenv("GENIUS_ACCESS_TOKEN")
 
-# --- Page Configuration ---
+if not GENIUS_ACCESS_TOKEN:
+    st.error("Please set the GENIUS_ACCESS_TOKEN in Streamlit secrets or environment variable.")
+    st.stop()
+
+# --- Page configuration ---
 st.set_page_config(
     page_title="Taylor Swift Lyric Explorer",
     page_icon="🎤",
@@ -18,66 +23,45 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- API Key Check ---
-if not GENIUS_ACCESS_TOKEN:
-    st.error(
-        "**Error:** Genius API Access Token not found. "
-        "Please set the `GENIUS_ACCESS_TOKEN` environment variable "
-        "or add it to Streamlit Secrets (for cloud deployment)."
-    )
-    st.stop()
+def get_lyrics_from_genius(song_title: str, artist_name: str = "Taylor Swift") -> str | None:
+    base_url = "https://api.genius.com"
+    headers = {"Authorization": f"Bearer {GENIUS_ACCESS_TOKEN}"}
+    search_url = f"{base_url}/search"
+    params = {"q": f"{song_title} {artist_name}"}
 
-# --- Initialize Genius API ---
-genius = lyricsgenius.Genius(
-    GENIUS_ACCESS_TOKEN,
-    verbose=False,
-    remove_section_headers=True,
-    excluded_terms=["(Live)", "(Acoustic)", "(Remix)"]
-)
-
-# --- Function to Fetch Clean Lyrics ---
-@st.cache_data
-def get_song_lyrics(song_title: str, artist_name: str = "Taylor Swift") -> str | None:
-    """
-    Fetch and clean lyrics from Genius, removing headers like "123 Contributors", translations, and song blurbs.
-    """
     try:
-        song = genius.search_song(song_title, artist=artist_name)
-        if song:
-            lyrics = song.lyrics
-
-            # Remove known endings
-            lyrics = re.sub(r'\d+Embed$', '', lyrics).strip()
-            lyrics = re.sub(r'You might also like.*?$', '', lyrics, flags=re.DOTALL).strip()
-
-            # Break lyrics into lines
-            lines = lyrics.splitlines()
-
-            # Find the first likely lyric line (usually starts with [Verse ...] or actual sentence)
-            start_index = 0
-            for i, line in enumerate(lines):
-                line = line.strip()
-                if re.match(r"^\[.*\]$", line):  # e.g., [Verse 1]
-                    start_index = i
-                    break
-                elif len(line.split()) > 3 and line[0].isupper():  # looks like a real lyric line
-                    start_index = i
-                    break
-
-            lyrics_clean = "\n".join(lines[start_index:]).strip()
-            return lyrics_clean
-        else:
+        response = requests.get(search_url, params=params, headers=headers)
+        response.raise_for_status()
+        json_data = response.json()
+        
+        hits = json_data["response"]["hits"]
+        if not hits:
             return None
+        
+        song_path = hits[0]["result"]["path"]
+        song_url = f"https://genius.com{song_path}"
+
+        page = requests.get(song_url)
+        soup = BeautifulSoup(page.text, "html.parser")
+
+        lyrics_divs = soup.select("div[data-lyrics-container='true']")
+        lyrics = "\n".join(div.get_text(separator="\n") for div in lyrics_divs).strip()
+
+        if not lyrics:
+            lyrics_container = soup.find("div", class_="lyrics")
+            if lyrics_container:
+                lyrics = lyrics_container.get_text(separator="\n").strip()
+        
+        return lyrics if lyrics else None
+
     except Exception as e:
         st.error(f"An error occurred while fetching lyrics: {e}")
         return None
 
 
-# --- Function to Generate Word Cloud ---
-@st.cache_data
 def generate_lyrics_wordcloud(lyrics: str) -> plt.Figure:
-    custom_stopwords = set(STOPWORDS)
-    custom_stopwords.update([
+    stopwords = set(STOPWORDS)
+    stopwords.update([
         "verse", "chorus", "bridge", "intro", "outro", "pre", "hook", "post",
         "interlude", "skit", "lyrics", "fade", "out", "song", "yeah", "oh",
         "na", "ah", "hmm", "gonna", "wanna", "da", "la", "like", "just", "dont",
@@ -89,7 +73,7 @@ def generate_lyrics_wordcloud(lyrics: str) -> plt.Figure:
         width=1000,
         height=500,
         background_color="white",
-        stopwords=custom_stopwords,
+        stopwords=stopwords,
         min_font_size=10,
         max_words=200,
         collocations=False
@@ -102,7 +86,8 @@ def generate_lyrics_wordcloud(lyrics: str) -> plt.Figure:
     ax.set_facecolor('none')
     return fig
 
-# --- Streamlit App UI ---
+
+# --- Streamlit UI ---
 st.title("🎶 Taylor Swift Lyric Explorer & Word Cloud Generator")
 st.markdown(
     "Unleash your inner Swiftie! Enter any Taylor Swift song title to "
@@ -118,7 +103,7 @@ song_input = st.text_input(
 if st.button("Get Lyrics & Word Cloud"):
     if song_input:
         with st.spinner(f"Searching for '{song_input}' lyrics..."):
-            lyrics = get_song_lyrics(song_input)
+            lyrics = get_lyrics_from_genius(song_input)
 
         if lyrics:
             st.subheader(f"🎤 Lyrics for '{song_input}'")
